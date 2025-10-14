@@ -1,0 +1,32 @@
+SELECT order_id, order_delivered_customer_date, order_estimated_delivery_date, julianday(order_delivered_customer_date) - julianday(order_estimated_delivery_date) AS delay FROM orders
+WHERE order_status != 'canceled'
+AND date(order_purchase_timestamp) >= date('2018-10-17', '-3 months')
+AND delay >= 3
+ORDER BY delay;
+
+SELECT seller_id, SUM(price) AS total_sales
+FROM (SELECT DISTINCT order_items.order_id, order_items.seller_id, order_items.price FROM order_items
+JOIN orders ON order_items.order_id = orders.order_id
+WHERE orders.order_status = 'delivered') 
+GROUP BY seller_id
+HAVING SUM(price) > 100000
+ORDER BY total_sales DESC;
+
+WITH latest_order AS(SELECT MAX(order_purchase_timestamp) FROM orders)
+SELECT seller_id, MIN(order_purchase_timestamp) AS first_sale_date, COUNT(order_id) AS total_items_sold
+FROM (SELECT DISTINCT order_items.order_id, order_items.seller_id, orders.order_purchase_timestamp FROM order_items
+INNER JOIN orders ON order_items.order_id = orders.order_id
+WHERE order_status = 'delivered')
+GROUP BY seller_id
+HAVING first_sale_date > date((SELECT * from latest_order), '-3 months')
+AND total_items_sold > 30;
+
+SELECT customer_zip_code_prefix, COUNT(review_id) AS reviews, AVG(review_score) AS average_score 
+FROM (SELECT DISTINCT order_reviews.order_id, review_id, customer_zip_code_prefix, review_score FROM order_reviews
+JOIN orders ON orders.order_id = order_reviews.order_id
+JOIN customers ON customers.customer_id = orders.customer_id
+WHERE date(order_purchase_timestamp) >= date('2018-10-17', '-12 months'))
+GROUP BY customer_zip_code_prefix
+HAVING reviews > 30
+ORDER BY average_score ASC
+LIMIT 5;
